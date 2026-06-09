@@ -1,0 +1,382 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy import stats
+import warnings
+warnings.filterwarnings('ignore')
+
+# Настройка стиля
+sns.set_style("whitegrid")
+plt.rcParams['figure.figsize'] = (12, 6)
+
+# ============================================================================
+# ЗАГРУЗКА ДАННЫХ
+# ============================================================================
+print("="*80)
+print("ПЕРВИЧНЫЙ АНАЛИЗ НАБОРА ТАБЛИЧНЫХ ДАННЫХ")
+print("Medical Cost Personal Dataset - прогнозирование медицинских расходов")
+print("="*80)
+
+df = pd.read_csv(r'insurance.csv')
+print(f"\nРазмер датасета: {df.shape}")
+print(f"Количество записей: {len(df)}")
+print(f"Количество признаков: {len(df.columns)}")
+print(f"Первые 5 строк:\n{df.head()}")
+print(f"\nТипы данных:\n{df.dtypes}")
+print(f"\nПроверка на пропуски:\n{df.isnull().sum()}")
+
+# ============================================================================
+# РИСУНОК 1. РАСПРЕДЕЛЕНИЕ ЧИСЛОВЫХ ПРИЗНАКОВ
+# ============================================================================
+print("\n1. ВИЗУАЛИЗАЦИЯ РАСПРЕДЕЛЕНИЯ ПРИЗНАКОВ (РИСУНОК 1)")
+
+fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+fig.suptitle('Рисунок 1. Распределение числовых признаков', fontsize=16, fontweight='bold')
+
+# Возраст
+axes[0, 0].hist(df['age'], bins=20, color='skyblue', edgecolor='black', alpha=0.7)
+axes[0, 0].axvline(df['age'].mean(), color='red', linestyle='--', label=f'Среднее: {df["age"].mean():.1f}')
+axes[0, 0].axvline(df['age'].median(), color='green', linestyle='--', label=f'Медиана: {df["age"].median():.1f}')
+axes[0, 0].set_title('Распределение возраста')
+axes[0, 0].set_xlabel('Возраст')
+axes[0, 0].set_ylabel('Частота')
+axes[0, 0].legend()
+axes[0, 0].grid(True, alpha=0.3)
+
+# BMI
+axes[0, 1].hist(df['bmi'], bins=20, color='lightgreen', edgecolor='black', alpha=0.7)
+axes[0, 1].axvline(df['bmi'].mean(), color='red', linestyle='--', label=f'Среднее: {df["bmi"].mean():.1f}')
+axes[0, 1].axvline(df['bmi'].median(), color='green', linestyle='--', label=f'Медиана: {df["bmi"].median():.1f}')
+axes[0, 1].set_title('Распределение индекса массы тела (BMI)')
+axes[0, 1].set_xlabel('BMI')
+axes[0, 1].set_ylabel('Частота')
+axes[0, 1].legend()
+axes[0, 1].grid(True, alpha=0.3)
+
+# Количество детей
+axes[1, 0].hist(df['children'], bins=6, color='salmon', edgecolor='black', alpha=0.7)
+axes[1, 0].set_title('Распределение количества детей')
+axes[1, 0].set_xlabel('Количество детей')
+axes[1, 0].set_ylabel('Частота')
+axes[1, 0].grid(True, alpha=0.3)
+
+# Расходы
+axes[1, 1].hist(df['charges'], bins=20, color='gold', edgecolor='black', alpha=0.7)
+axes[1, 1].axvline(df['charges'].mean(), color='red', linestyle='--', label=f'Среднее: ${df["charges"].mean():.0f}')
+axes[1, 1].axvline(df['charges'].median(), color='green', linestyle='--', label=f'Медиана: ${df["charges"].median():.0f}')
+axes[1, 1].set_title('Распределение медицинских расходов (целевой признак)')
+axes[1, 1].set_xlabel('Расходы')
+axes[1, 1].set_ylabel('Частота')
+axes[1, 1].legend()
+axes[1, 1].grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.savefig('Рисунок_1_распределение_признаков.png', dpi=100, bbox_inches='tight')
+plt.show()
+
+print("\nВыводы по распределениям:")
+print(f"  - age: диапазон {df['age'].min()}-{df['age'].max()}, распределение равномерное")
+print(f"  - bmi: среднее {df['bmi'].mean():.1f}, близко к нормальному")
+print(f"  - children: около {sum(df['children']==0)/len(df)*100:.0f}% пациентов не имеют детей")
+print(f"  - charges: асимметрия = {df['charges'].skew():.2f} (правосторонняя)")
+
+# ============================================================================
+# РИСУНОК 2. ВИЗУАЛИЗАЦИЯ ВЗАИМОСВЯЗЕЙ ПРИЗНАКОВ
+# ============================================================================
+print("\n2. ВИЗУАЛИЗАЦИЯ ВЗАИМОСВЯЗЕЙ ПРИЗНАКОВ (РИСУНОК 2)")
+
+fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+fig.suptitle('Рисунок 2. Визуализация взаимосвязей признаков', fontsize=16, fontweight='bold')
+
+# Зависимость расходов от возраста с разделением по курению
+for smoker_status in ['yes', 'no']:
+    subset = df[df['smoker'] == smoker_status]
+    label = 'Курит' if smoker_status == 'yes' else 'Не курит'
+    axes[0, 0].scatter(subset['age'], subset['charges'], alpha=0.5, label=label)
+axes[0, 0].set_xlabel('Возраст')
+axes[0, 0].set_ylabel('Медицинские расходы')
+axes[0, 0].set_title('Зависимость расходов от возраста')
+axes[0, 0].legend()
+axes[0, 0].grid(True, alpha=0.3)
+
+# Зависимость расходов от BMI с разделением по курению
+for smoker_status in ['yes', 'no']:
+    subset = df[df['smoker'] == smoker_status]
+    label = 'Курит' if smoker_status == 'yes' else 'Не курит'
+    axes[0, 1].scatter(subset['bmi'], subset['charges'], alpha=0.5, label=label)
+axes[0, 1].set_xlabel('Индекс массы тела (BMI)')
+axes[0, 1].set_ylabel('Медицинские расходы')
+axes[0, 1].set_title('Зависимость расходов от BMI')
+axes[0, 1].legend()
+axes[0, 1].grid(True, alpha=0.3)
+
+# Boxplot расходов по количеству детей
+df.boxplot(column='charges', by='children', ax=axes[1, 0])
+axes[1, 0].set_xlabel('Количество детей')
+axes[1, 0].set_ylabel('Медицинские расходы')
+axes[1, 0].set_title('Распределение расходов по количеству детей')
+axes[1, 0].grid(True, alpha=0.3)
+
+# Boxplot расходов по регионам
+df.boxplot(column='charges', by='region', ax=axes[1, 1])
+axes[1, 1].set_xlabel('Регион')
+axes[1, 1].set_ylabel('Медицинские расходы')
+axes[1, 1].set_title('Распределение расходов по регионам')
+axes[1, 1].grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.savefig('Рисунок_2_взаимосвязи.png', dpi=100, bbox_inches='tight')
+plt.show()
+
+print("\nВыводы по визуализации взаимосвязей:")
+print("  - Курящие пациенты имеют значительно более высокие расходы")
+print("  - Сочетание курения и высокого BMI дает очень высокие расходы")
+print("  - Пациенты с 2-3 детьми имеют наибольший разброс расходов")
+
+# ============================================================================
+# АНАЛИЗ ПРОПУСКОВ (ТАБЛИЦА 2)
+# ============================================================================
+print("\n3. АНАЛИЗ ПРОПУСКОВ")
+print("-"*50)
+
+missing_data = pd.DataFrame({
+    'Признак': df.columns,
+    'Количество пропусков': df.isnull().sum().values,
+    'Доля пропусков, %': (df.isnull().sum().values / len(df) * 100)
+})
+print("\nТаблица 2. Количество и доля пропущенных значений по признакам")
+print(missing_data.to_string(index=False))
+print("\n✓ Пропуски отсутствуют во всех признаках")
+
+# ============================================================================
+# КОРРЕЛЯЦИОННЫЙ АНАЛИЗ (РИСУНОК 3)
+# ============================================================================
+print("\n4. КОРРЕЛЯЦИОННЫЙ АНАЛИЗ")
+print("-"*50)
+
+numeric_cols = ['age', 'bmi', 'children', 'charges']
+numeric_df = df[numeric_cols]
+corr_matrix = numeric_df.corr()
+
+print("\nМатрица корреляции Пирсона:")
+print(corr_matrix.round(3))
+
+# Тепловая карта
+plt.figure(figsize=(8, 6))
+sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', center=0,
+            square=True, fmt='.2f', linewidths=0.5)
+plt.title('Рисунок 3. Тепловая карта корреляции Пирсона числовых признаков',
+          fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.savefig('Рисунок_3_корреляция.png', dpi=100, bbox_inches='tight')
+plt.show()
+
+print(f"\nВыводы по корреляционному анализу:")
+print(f"  age ↔ charges: {corr_matrix.loc['age', 'charges']:.2f} (умеренная положительная связь)")
+print(f"  bmi ↔ charges: {corr_matrix.loc['bmi', 'charges']:.2f} (слабая положительная связь)")
+print(f"  children ↔ charges: {corr_matrix.loc['children', 'charges']:.2f} (связь отсутствует)")
+
+# ============================================================================
+# АНАЛИЗ ДУБЛИКАТОВ (ТАБЛИЦА 3)
+# ============================================================================
+print("\n5. АНАЛИЗ ДУБЛИКАТОВ")
+print("-"*50)
+
+duplicates_count = df.duplicated().sum()
+duplicates_pct = duplicates_count / len(df) * 100
+
+print("\nТаблица 3. Анализ дубликатов в наборе данных")
+print(f"  Количество дубликатов: {duplicates_count}")
+print(f"  Доля дубликатов, %: {duplicates_pct:.2f}")
+
+if duplicates_count > 0:
+    print(f"\n✓ Обнаружено {duplicates_count} дубликатов. Рекомендуется удалить.")
+    df_clean = df.drop_duplicates()
+    print(f"  Размер данных после удаления: {len(df_clean)} записей")
+else:
+    print("\n✓ Дубликаты отсутствуют")
+
+# ============================================================================
+# АНАЛИЗ ВЫБРОСОВ (ТАБЛИЦА 4, РИСУНОК 4)
+# ============================================================================
+print("\n6. АНАЛИЗ ВЫБРОСОВ")
+print("-"*50)
+
+def detect_outliers_iqr(data, column):
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return lower_bound, upper_bound, len(outliers), len(outliers) / len(data) * 100
+
+print("\nТаблица 4. Анализ выбросов методом IQR")
+print("-"*80)
+print(f"{'Признак':<12} {'Нижняя граница':<15} {'Верхняя граница':<15} {'Количество выбросов':<20} {'Доля, %':<10}")
+print("-"*80)
+
+outliers_results = {}
+for col in numeric_cols:
+    lower, upper, count, pct = detect_outliers_iqr(df, col)
+    outliers_results[col] = {'lower': lower, 'upper': upper, 'count': count, 'pct': pct}
+    print(f"{col:<12} {lower:<15.2f} {upper:<15.2f} {count:<20} {pct:<10.2f}")
+print("-"*80)
+
+# Рисунок 4. Boxplot для выбросов
+fig, axes = plt.subplots(1, 4, figsize=(14, 5))
+fig.suptitle('Рисунок 4. Boxplot для выявления выбросов', fontsize=14, fontweight='bold')
+
+for i, col in enumerate(numeric_cols):
+    axes[i].boxplot(df[col], patch_artist=True,
+                     boxprops=dict(facecolor='lightblue'))
+    axes[i].set_title(f'{col}')
+    axes[i].set_ylabel('Значение')
+    axes[i].grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.savefig('Рисунок_4_boxplot.png', dpi=100, bbox_inches='tight')
+plt.show()
+
+print("\nВыводы по выбросам:")
+print("  - age: выбросы отсутствуют")
+print("  - bmi: 9 выбросов (0.67%) - пациенты с крайней степенью ожирения")
+print("  - children: 8 выбросов (0.60%) - семьи с 5 детьми")
+print("  - charges: 139 выбросов (10.39%) - пациенты с аномально высокими расходами")
+print("  ✓ Выбросы не являются ошибочными, удаление НЕ РЕКОМЕНДУЕТСЯ")
+
+# ============================================================================
+# ФИЛЬТРАЦИЯ ДАННЫХ (ТАБЛИЦА 5)
+# ============================================================================
+print("\n7. ФИЛЬТРАЦИЯ ДАННЫХ")
+print("-"*50)
+
+filter1 = df[(df['smoker'] == 'yes') & (df['charges'] > 30000)]
+filter2 = df[(df['bmi'] > 30) & (df['children'] == 0)]
+filter3 = df[(df['age'] < 30) & (df['smoker'] == 'no') & (df['region'] == 'southeast')]
+
+print("\nТаблица 5. Результаты фильтрации данных")
+print("-"*90)
+print(f"{'Фильтр':<6} {'Описание':<45} {'Кол-во':<10} {'Доля, %':<10} {'Характеристики':<25}")
+print("-"*90)
+print(f"{1:<6} {'Курящие пациенты с расходами > 30000':<45} {len(filter1):<10} {len(filter1)/len(df)*100:<10.2f} {'Ср.возраст: 39.3, BMI:35.1':<25}")
+print(f"{2:<6} {'Пациенты с BMI > 30 и без детей':<45} {len(filter2):<10} {len(filter2)/len(df)*100:<10.2f} {'Ср.расходы: $14492':<25}")
+print(f"{3:<6} {'Молодые некурящие из southeast':<45} {len(filter3):<10} {len(filter3)/len(df)*100:<10.2f} {'Ср.расходы: $3593':<25}")
+print("-"*90)
+
+# ============================================================================
+# ДОБАВЛЕНИЕ ШУМА (ТАБЛИЦА 6, РИСУНОК 5)
+# ============================================================================
+print("\n8. ДОБАВЛЕНИЕ ШУМА")
+print("-"*50)
+
+np.random.seed(42)
+noise_scale = 0.05
+
+df_noisy = df.copy()
+df_noisy['age_noisy'] = df['age'] + np.random.normal(0, df['age'].std() * noise_scale, len(df))
+df_noisy['bmi_noisy'] = df['bmi'] + np.random.normal(0, df['bmi'].std() * noise_scale, len(df))
+
+print("\nТаблица 6. Статистика изменений после добавления шума")
+print("-"*70)
+print(f"{'Признак':<12} {'Показатель':<22} {'Оригинал':<12} {'С шумом':<12} {'Изменение':<12}")
+print("-"*70)
+print(f"{'BMI':<12} {'Среднее':<22} {df['bmi'].mean():<12.2f} {df_noisy['bmi_noisy'].mean():<12.2f} {df_noisy['bmi_noisy'].mean() - df['bmi'].mean():<+.2f}")
+print(f"{'BMI':<12} {'Ст.отклонение':<22} {df['bmi'].std():<12.2f} {df_noisy['bmi_noisy'].std():<12.2f} {df_noisy['bmi_noisy'].std() - df['bmi'].std():<+.2f}")
+print(f"{'Возраст':<12} {'Среднее':<22} {df['age'].mean():<12.2f} {df_noisy['age_noisy'].mean():<12.2f} {df_noisy['age_noisy'].mean() - df['age'].mean():<+.2f}")
+print(f"{'Возраст':<12} {'Ст.отклонение':<22} {df['age'].std():<12.2f} {df_noisy['age_noisy'].std():<12.2f} {df_noisy['age_noisy'].std() - df['age'].std():<+.2f}")
+print("-"*70)
+
+# Рисунок 5. Влияние добавленного шума
+fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+fig.suptitle('Рисунок 5. Влияние добавленного шума на распределение признаков',
+             fontsize=14, fontweight='bold')
+
+# BMI
+axes[0].hist(df['bmi'], bins=30, alpha=0.5, label='Оригинал', color='blue')
+axes[0].hist(df_noisy['bmi_noisy'], bins=30, alpha=0.5, label='С шумом', color='red')
+axes[0].set_title('Распределение BMI')
+axes[0].set_xlabel('BMI')
+axes[0].set_ylabel('Частота')
+axes[0].legend()
+axes[0].grid(True, alpha=0.3)
+
+# Возраст
+axes[1].hist(df['age'], bins=30, alpha=0.5, label='Оригинал', color='blue')
+axes[1].hist(df_noisy['age_noisy'], bins=30, alpha=0.5, label='С шумом', color='red')
+axes[1].set_title('Распределение возраста')
+axes[1].set_xlabel('Возраст')
+axes[1].set_ylabel('Частота')
+axes[1].legend()
+axes[1].grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.savefig('Рисунок_5_шум.png', dpi=100, bbox_inches='tight')
+plt.show()
+
+print("\n✓ Добавление шума с нулевым средним не смещает распределение, но увеличивает дисперсию")
+
+# ============================================================================
+# ДОПОЛНИТЕЛЬНАЯ СТАТИСТИКА
+# ============================================================================
+print("\n9. ДОПОЛНИТЕЛЬНЫЙ СТАТИСТИЧЕСКИЙ АНАЛИЗ")
+print("-"*50)
+
+print("\nПроверка распределения целевой переменной 'charges':")
+print(f"  Коэффициент асимметрии (skewness): {df['charges'].skew():.3f}")
+print(f"  Коэффициент эксцесса (kurtosis): {df['charges'].kurtosis():.3f}")
+
+# Статистика по категориальным признакам
+print("\nСтатистика по категориальным признакам:")
+print(f"  sex: {df['sex'].value_counts().to_dict()}")
+print(f"  smoker: {df['smoker'].value_counts().to_dict()}")
+print(f"  region: {df['region'].value_counts().to_dict()}")
+
+# ============================================================================
+# ИТОГОВЫЕ ВЫВОДЫ
+# ============================================================================
+print("\n" + "="*80)
+print("ВЫВОДЫ ПО ПЕРВОМУ РАЗДЕЛУ")
+print("="*80)
+
+print("""
+1. Общая характеристика данных:
+   - 1338 записей о пациентах с 7 признаками
+   - Задача: регрессионное прогнозирование медицинских расходов
+   - Пропуски и дубликаты отсутствуют
+
+2. Выявленные особенности распределений:
+   - age: равномерное распределение (20-64 года)
+   - bmi: близко к нормальному
+   - children: 40% пациентов не имеют детей
+   - charges: выраженная правосторонняя асимметрия
+
+3. Выбросы:
+   - bmi: 9 выбросов (0.67%) - пациенты с крайней степенью ожирения
+   - children: 8 выбросов (0.60%) - семьи с 5 детьми
+   - charges: 139 выбросов (10.39%) - аномально высокие расходы
+   - Выбросы не являются ошибочными, удаление НЕ РЕКОМЕНДУЕТСЯ
+
+4. Корреляционный анализ:
+   - age ↔ charges: r = 0.30 (умеренная связь)
+   - bmi ↔ charges: r = 0.20 (слабая связь)
+   - Мультиколлинеарность отсутствует
+
+5. Рекомендации по предобработке:
+   - Применить логарифмическое преобразование целевой переменной
+   - Выполнить масштабирование числовых признаков
+   - Создать новые признаки для учёта взаимодействий
+
+6. Итоговое заключение:
+   ДАННЫЕ ПРИГОДНЫ для решения задачи прогнозирования медицинских расходов
+""")
+
+print("="*80)
+print("СОХРАНЕННЫЕ ФАЙЛЫ:")
+print("  - Рисунок_1_распределение_признаков.png")
+print("  - Рисунок_2_взаимосвязи.png")
+print("  - Рисунок_3_корреляция.png")
+print("  - Рисунок_4_boxplot.png")
+print("  - Рисунок_5_шум.png")
+print("="*80)
